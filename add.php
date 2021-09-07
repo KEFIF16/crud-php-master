@@ -20,6 +20,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !empty($_POST)) {
 	$commentError = '';
 	$metierError = '';
 	$urlError = '';
+  $fileError = '';
 
 	// on recupère nos valeurs 
   $name = htmlentities(trim($_POST['name']));
@@ -31,7 +32,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !empty($_POST)) {
 	$comment = htmlentities(trim($_POST['comment']));
 	$metier = htmlentities(trim($_POST['metier']));
 	$url = htmlentities(trim($_POST['url'])); // on vérifie nos champs 
-  // $profile_image_url = htmlentities(trim($_POST['profile_image_url']))
+  $profile_image_url = "";
   $valid = true;
 
 	if (empty($name)) {
@@ -93,28 +94,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !empty($_POST)) {
 	if ($valid) { 
 		$pdo = Database::connect();
 		$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-		$createSql = "INSERT INTO user ( name, firstname, age, tel, email, pays,comment, metier, url) values(?, ?, ?, ?, ?, ?, ?, ?, ?)";
+		$createSql = "INSERT INTO user (name, firstname, age, tel, email, pays,comment, metier, url, profile_image_url, login, password) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 		$create = $pdo->prepare($createSql);
-		$res = $create->execute(array($name, $firstname, $age, $tel, $email, $pays, $comment, $metier, $url));
+		$res = $create->execute(array($name, $firstname, $age, $tel, $email, $pays, $comment, $metier, $url, $profile_image_url, "logintest", "passwordetest"));
 
-        // if we successfully inserted a new user
-        if ($create) {
-            $id = $pdo->lastInsertId();
-
-            $ext = pathinfo($_FILES["image"]["name"])['extension'];
-            if (strtolower($ext) === "png") {
-				$path = 'uploads/' . $id . '.png';
-                move_uploaded_file($_FILES["image"]["tmp_name"], $path);
-				
-				$updateSql = "UPDATE user set profile_image_url = ? WHERE id = ?";
-				$update = $pdo->prepare($updateSql);
-				$update->execute(array($path, $id));
-            } else {
-              throw new Exception("Image should be a png", 1);
-            }
-
-            $userId = $pdo->lastInsertId();
-        }
+    // if we successfully inserted a new user
+    if ($create && $_FILES["image"]["error"] == 0) {
+        $id = $pdo->lastInsertId();
+      $ext = strtolower(pathinfo($_FILES["image"]["name"])['extension']);
+      $allowed_formats = ["png", "jpg", "jpeg"];
+      
+      if (in_array($ext, $allowed_formats)) {
+		    $path = 'uploads/' . $id . "." . $ext;
+        move_uploaded_file($_FILES["image"]["tmp_name"], $path);
+	
+		    $updateSql = "UPDATE user set profile_image_url = ? WHERE id = ?";
+		    $update = $pdo->prepare($updateSql);
+		    $update->execute(array($path, $id));
+      } else {
+        throw new Exception(sprintf("file must be in one of the following formats: ", implode(", ", $allowed_formats)), 1);
+      }
+        $userId = $pdo->lastInsertId();
+    }
 
 		Database::disconnect();
 		header("Location: index.php");
@@ -130,27 +131,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !empty($_POST)) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
   </head>
   <body>
-    <br />
+    
     <div class="container">
-      <br />
+      
       <div class="row">
-        <br />
+        
         <h3>Ajouter un contact</h3>
-        <p></p>
+        
       </div>
 
       <p>
-        <br />
+        
       </p>
 
       <form method="post" action="add.php" enctype="multipart/form-data">
-        <br />
+        
         <div
           class="control-group <?php echo !empty($nameError) ? 'error' : ''; ?>"
         >
           <label class="control-label">Name</label>
 
-          <br />
+          
           <div class="controls">
             <input
               name="name"
@@ -162,7 +163,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !empty($_POST)) {
             <span class="help-inline"><?php echo $nameError; ?></span>
             <?php endif;?>
           </div>
-          <p></p>
+          
         </div>
 
         <div
@@ -248,7 +249,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !empty($_POST)) {
             <span class="help-inline"><?php echo $telError; ?></span>
             <?php endif;?>
           </div>
-          <p></p>
+          
         </div>
 
         <div
@@ -280,7 +281,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !empty($_POST)) {
         >
           <label class="checkbox-inline">Metier</label>
 
-          <br />
+          
           <div class="controls">
             Dev : <input type="checkbox" name="metier" value="dev"
             <?php if (isset($metier) && $metier == "dev") {
@@ -308,7 +309,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !empty($_POST)) {
         >
           <label class="control-label">Siteweb</label>
 
-          <br />
+          
           <div class="controls">
             <input
               type="text"
@@ -319,7 +320,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !empty($_POST)) {
             <span class="help-inline"><?php echo $urlError; ?></span>
             <?php endif;?>
           </div>
-          <p></p>
+          
         </div>
 
         <div
@@ -337,7 +338,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !empty($_POST)) {
         >
           <label class="control-label">Commentaire </label>
 
-          <br />
+          
           <div class="controls">
             <textarea rows="4" cols="30" name="comment">
 <?php if (isset($comment)) {
@@ -349,16 +350,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !empty($_POST)) {
             <span class="help-inline"><?php echo $commentError; ?></span>
             <?php endif;?>
           </div>
-          <p></p>
         </div>
 
         image
-        <input type="file" enctype="multipart/form-data" name="image" />
-        <p></p>
-
-        <p></p>
-
-        <br />
+        <input type="file" name="image" />
         <div class="form-actions">
           <input
             type="submit"
@@ -368,12 +363,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !empty($_POST)) {
           />
           <a class="btn" href="index.php">Retour</a>
         </div>
-        <p></p>
+        
       </form>
 
-      <p></p>
+      
     </div>
 
-    <p></p>
+    
   </body>
 </html>
